@@ -1,0 +1,13 @@
+date,category,product,revenue,units_sold,region
+2024-01-15,Electronics,Laptop,1200.50,3,North
+2024-01-15,Electronics,Phone,899.99,5,South
+2024-02-01,Clothing,Jacket,149.99,12,East
+2024-02-01,Clothing,Shoes,89.50,20,West
+2024-03-10,Electronics,Tablet,450.00,8,North
+2024-03-10,Food,Coffee,12.99,100,South
+2024-04-05,Food,Snacks,8.50,200,East
+2024-04-05,Clothing,T-Shirt,29.99,50,West
+2024-05-20,Electronics,Headphones,199.99,15,North
+2024-05-20,Food,Tea,9.99,80,South
+2024-06-15,Clothing,Dress,79.99,25,East
+2024-06-15,Electronics,Monitor,349.00,6,West
