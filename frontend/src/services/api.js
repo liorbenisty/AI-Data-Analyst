@@ -21,6 +21,15 @@ export const listFiles = async () => {
   return response.data;
 };
 
+export const fetchFilePreview = async (fileId, limit = 50, signal) => {
+  const response = await api.get(`/files/${encodeURIComponent(fileId)}/preview`, {
+    params: { limit },
+    signal,
+    timeout: 60000,
+  });
+  return response.data;
+};
+
 export const sendChatMessage = async (message, fileId, sessionId) => {
   const response = await api.post('/chat', {
     message,

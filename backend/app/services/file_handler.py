@@ -5,7 +5,12 @@ from datetime import datetime
 
 import pandas as pd
 
-from app.config import UPLOAD_DIR, ALLOWED_EXTENSIONS, MAX_FILE_SIZE_MB
+from app.config import (
+    UPLOAD_DIR,
+    ALLOWED_EXTENSIONS,
+    MAX_FILE_SIZE_MB,
+    PREVIEW_MAX_LIMIT,
+)
 
 
 class FileValidationError(Exception):
@@ -92,6 +97,44 @@ def load_dataframe(file_path: Path) -> pd.DataFrame:
         return pd.read_excel(file_path)
     else:
         raise FileValidationError(f"Unsupported file format: {ext}")
+
+
+def read_preview_dataframe(file_path: Path, limit: int) -> pd.DataFrame:
+    """Load at most `limit` rows without reading the full file (CSV uses nrows)."""
+    capped = max(1, min(limit, PREVIEW_MAX_LIMIT))
+    ext = file_path.suffix.lower()
+    if ext == ".csv":
+        return pd.read_csv(file_path, nrows=capped)
+    if ext in (".xlsx", ".xls"):
+        return pd.read_excel(file_path, nrows=capped)
+    raise FileValidationError(f"Unsupported file format: {ext}")
+
+
+def get_file_preview(file_id: str, limit: int) -> dict | None:
+    """Build a lazy preview payload: schema from metadata, rows from disk head only."""
+    meta = get_file_metadata(file_id)
+    if not meta:
+        return None
+    path = Path(meta["file_path"])
+    if not path.exists():
+        return None
+
+    capped = max(1, min(limit, PREVIEW_MAX_LIMIT))
+    schema = meta["schema"]
+    df = read_preview_dataframe(path, capped)
+    rows = json.loads(df.to_json(orient="records", date_format="iso"))
+
+    return {
+        "file_id": file_id,
+        "original_name": meta["original_name"],
+        "preview_row_count": len(rows),
+        "total_row_count": schema["row_count"],
+        "column_count": schema["column_count"],
+        "columns": schema["columns"],
+        "dtypes": schema["dtypes"],
+        "null_counts": schema["null_counts"],
+        "rows": rows,
+    }
 
 
 def get_file_metadata(file_id: str) -> dict | None:

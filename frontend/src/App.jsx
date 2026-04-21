@@ -13,6 +13,7 @@ import AutoGraphIcon from '@mui/icons-material/AutoGraph';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
 import { createAppTheme } from './theme/theme';
 import FileUpload from './components/FileUpload';
+import DataPreviewPanel from './components/DataPreviewPanel';
 import ChatInterface from './components/ChatInterface';
 import useFileUpload from './hooks/useFileUpload';
 import useChat from './hooks/useChat';
@@ -162,15 +163,26 @@ function App() {
           />
         </Box>
 
-        <Box sx={{ flex: 1, overflow: 'hidden' }}>
-          <ChatInterface
-            messages={messages}
-            loading={loading}
-            onSend={handleSend}
-            activeFile={activeFile}
-            suggestions={uploadSuggestions}
-            followUpSuggestions={followUpSuggestions}
-          />
+        <Box
+          sx={{
+            flex: 1,
+            minHeight: 0,
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <DataPreviewPanel activeFile={activeFile} />
+          <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+            <ChatInterface
+              messages={messages}
+              loading={loading}
+              onSend={handleSend}
+              activeFile={activeFile}
+              suggestions={uploadSuggestions}
+              followUpSuggestions={followUpSuggestions}
+            />
+          </Box>
         </Box>
       </Box>
 

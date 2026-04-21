@@ -20,3 +20,6 @@ CHARTS_DIR.mkdir(exist_ok=True)
 
 ALLOWED_EXTENSIONS = {".csv", ".xlsx", ".xls"}
 MAX_FILE_SIZE_MB = 50
+
+PREVIEW_DEFAULT_LIMIT = int(os.getenv("PREVIEW_DEFAULT_LIMIT", "50"))
+PREVIEW_MAX_LIMIT = int(os.getenv("PREVIEW_MAX_LIMIT", "200"))

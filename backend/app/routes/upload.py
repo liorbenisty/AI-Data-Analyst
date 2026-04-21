@@ -1,10 +1,12 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Query
 
+from app.config import PREVIEW_DEFAULT_LIMIT, PREVIEW_MAX_LIMIT
 from app.services.file_handler import (
     validate_file,
     save_file,
     list_all_files,
     get_file_metadata,
+    get_file_preview,
     FileValidationError,
 )
 from app.services.suggestions import generate_suggestions
@@ -55,3 +57,19 @@ async def get_file(file_id: str):
         "uploaded_at": metadata["uploaded_at"],
         "schema": metadata["schema"],
     }
+
+
+@router.get("/files/{file_id}/preview")
+async def preview_file(
+    file_id: str,
+    limit: int = Query(
+        PREVIEW_DEFAULT_LIMIT,
+        ge=1,
+        le=PREVIEW_MAX_LIMIT,
+        description="Number of rows to return from the start of the file",
+    ),
+):
+    payload = get_file_preview(file_id, limit)
+    if not payload:
+        raise HTTPException(status_code=404, detail="File not found")
+    return payload
