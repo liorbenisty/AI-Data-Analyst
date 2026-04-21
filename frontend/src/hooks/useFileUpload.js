@@ -6,6 +6,7 @@ export default function useFileUpload() {
   const [activeFile, setActiveFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+  const [suggestions, setSuggestions] = useState([]);
 
   const handleUpload = useCallback(async (file) => {
     setUploading(true);
@@ -20,6 +21,7 @@ export default function useFileUpload() {
       };
       setFiles((prev) => [newFile, ...prev]);
       setActiveFile(newFile);
+      setSuggestions(result.suggestions || []);
       return newFile;
     } catch (err) {
       const msg = err.response?.data?.detail || 'Upload failed';
@@ -48,6 +50,7 @@ export default function useFileUpload() {
     setActiveFile,
     uploading,
     error,
+    suggestions,
     handleUpload,
     loadFiles,
   };

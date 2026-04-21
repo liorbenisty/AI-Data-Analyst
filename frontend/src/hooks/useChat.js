@@ -1,12 +1,16 @@
-import { useState, useCallback } from 'react';
-import { sendChatMessage } from '../services/api';
+import { useState, useCallback, useRef } from 'react';
+import { sendChatMessage, resetSession } from '../services/api';
 
 export default function useChat() {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [followUpSuggestions, setFollowUpSuggestions] = useState([]);
+  const sessionIdRef = useRef(crypto.randomUUID());
 
   const sendMessage = useCallback(async (text, fileId) => {
     if (!text.trim() || !fileId || loading) return;
+
+    setFollowUpSuggestions([]);
 
     const userMsg = {
       id: Date.now(),
@@ -24,7 +28,7 @@ export default function useChat() {
     setLoading(true);
 
     try {
-      const result = await sendChatMessage(text, fileId);
+      const result = await sendChatMessage(text, fileId, sessionIdRef.current);
 
       const aiMsg = {
         id: Date.now() + 2,
@@ -38,6 +42,10 @@ export default function useChat() {
       setMessages((prev) =>
         prev.filter((m) => !m.loading).concat(aiMsg)
       );
+
+      if (result.follow_up_suggestions?.length) {
+        setFollowUpSuggestions(result.follow_up_suggestions);
+      }
     } catch (err) {
       let errorText = 'Something went wrong. Please try again.';
       if (err.code === 'ECONNABORTED') {
@@ -47,7 +55,7 @@ export default function useChat() {
       } else if (err.response?.data?.detail) {
         errorText = err.response.data.detail;
       } else if (!err.response) {
-        errorText = 'Cannot reach the server. Make sure the backend is running on port 8000.';
+        errorText = 'Cannot reach the server. Make sure the backend is running on port 8001.';
       }
 
       const errorMsg = {
@@ -65,9 +73,18 @@ export default function useChat() {
     }
   }, [loading]);
 
-  const clearMessages = useCallback(() => {
+  const clearMessages = useCallback(async () => {
+    const oldSessionId = sessionIdRef.current;
+    sessionIdRef.current = crypto.randomUUID();
     setMessages([]);
+    setFollowUpSuggestions([]);
+
+    try {
+      await resetSession(oldSessionId);
+    } catch {
+      // best-effort cleanup
+    }
   }, []);
 
-  return { messages, loading, sendMessage, clearMessages };
+  return { messages, loading, followUpSuggestions, sendMessage, clearMessages };
 }

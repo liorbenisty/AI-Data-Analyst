@@ -61,11 +61,12 @@ function App() {
     activeFile,
     uploading,
     error: uploadError,
+    suggestions: uploadSuggestions,
     handleUpload,
     loadFiles,
   } = useFileUpload();
 
-  const { messages, loading, sendMessage, clearMessages } = useChat();
+  const { messages, loading, followUpSuggestions, sendMessage, clearMessages } = useChat();
   const { status, mistralConfigured } = useBackendStatus();
 
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
@@ -167,6 +168,8 @@ function App() {
             loading={loading}
             onSend={handleSend}
             activeFile={activeFile}
+            suggestions={uploadSuggestions}
+            followUpSuggestions={followUpSuggestions}
           />
         </Box>
       </Box>

@@ -1,3 +1,6 @@
+import json
+import re
+
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
 from app.services.file_handler import get_dataset_summary, get_file_metadata
@@ -66,6 +69,26 @@ def inspect_data(state: AgentState) -> dict:
     }
 
 
+def _build_history_context(history: list) -> str:
+    """Format prior conversation turns into a compact context block."""
+    if not history:
+        return ""
+
+    lines = ["\nConversation history (prior turns):"]
+    for i, turn in enumerate(history[-5:], 1):
+        lines.append(f"\n--- Turn {i} ---")
+        lines.append(f"User asked: {turn.get('question', '')}")
+        if turn.get("code"):
+            lines.append(f"Code generated:\n{turn['code']}")
+        if turn.get("result"):
+            result_preview = turn["result"][:500]
+            lines.append(f"Result: {result_preview}")
+        if turn.get("had_chart"):
+            lines.append("(A chart was produced)")
+
+    return "\n".join(lines)
+
+
 def generate_code(state: AgentState) -> dict:
     """Node 2: Ask Mistral to write Python code to answer the user's question."""
     llm = get_llm()
@@ -73,6 +96,7 @@ def generate_code(state: AgentState) -> dict:
     messages = state.get("messages", [])
     dataset_info = state.get("dataset_info", "")
     error = state.get("error", "")
+    history = state.get("conversation_history", [])
 
     user_question = ""
     for msg in reversed(messages):
@@ -82,8 +106,13 @@ def generate_code(state: AgentState) -> dict:
 
     prompt_parts = [
         f"Dataset information:\n{dataset_info}",
-        f"\nUser question: {user_question}",
     ]
+
+    history_ctx = _build_history_context(history)
+    if history_ctx:
+        prompt_parts.append(history_ctx)
+
+    prompt_parts.append(f"\nUser question: {user_question}")
 
     if error:
         prompt_parts.append(
@@ -142,14 +171,45 @@ def evaluate_result(state: AgentState) -> dict:
     return {}
 
 
+RESPONSE_SYSTEM_PROMPT = """\
+You are a helpful data analyst assistant. Summarize analysis results clearly and concisely.
+
+After your summary, you MUST include a JSON block with exactly 3 follow-up questions \
+the user might want to ask next about this dataset. Base them on what was just analyzed.
+
+Format the JSON block exactly like this at the end of your response:
+```suggestions
+["Question 1?", "Question 2?", "Question 3?"]
+```\
+"""
+
+
+def _parse_suggestions(text: str) -> tuple[str, list]:
+    """Extract follow-up suggestions from the LLM response and return clean text + suggestions."""
+    pattern = r"```suggestions\s*\n(.*?)\n\s*```"
+    match = re.search(pattern, text, re.DOTALL)
+
+    if not match:
+        return text.strip(), []
+
+    try:
+        suggestions = json.loads(match.group(1).strip())
+    except (json.JSONDecodeError, TypeError):
+        suggestions = []
+
+    clean_text = text[:match.start()].strip()
+    return clean_text, suggestions
+
+
 def generate_response(state: AgentState) -> dict:
-    """Node 5: Ask Mistral to summarize the results in natural language."""
+    """Node 5: Ask Mistral to summarize the results and suggest follow-ups."""
     llm = get_llm()
 
     execution_result = state.get("execution_result", "")
     chart_path = state.get("chart_path", "")
     error = state.get("error", "")
     generated_code = state.get("generated_code", "")
+    history = state.get("conversation_history", [])
 
     messages = state.get("messages", [])
     user_question = ""
@@ -159,6 +219,10 @@ def generate_response(state: AgentState) -> dict:
             break
 
     prompt_parts = [f"User question: {user_question}"]
+
+    history_ctx = _build_history_context(history)
+    if history_ctx:
+        prompt_parts.insert(0, history_ctx)
 
     if error:
         prompt_parts.append(
@@ -176,12 +240,24 @@ def generate_response(state: AgentState) -> dict:
         )
 
     llm_messages = [
-        SystemMessage(content="You are a helpful data analyst assistant. Summarize analysis results clearly and concisely."),
+        SystemMessage(content=RESPONSE_SYSTEM_PROMPT),
         HumanMessage(content="\n".join(prompt_parts)),
     ]
 
     response = llm.invoke(llm_messages)
+    clean_text, suggestions = _parse_suggestions(response.content)
+
+    new_turn = {
+        "question": user_question,
+        "code": generated_code,
+        "result": execution_result[:500] if execution_result else "",
+        "had_chart": bool(chart_path),
+        "error": error or "",
+    }
+    updated_history = list(history) + [new_turn]
 
     return {
-        "messages": [AIMessage(content=response.content)],
+        "messages": [AIMessage(content=clean_text)],
+        "follow_up_suggestions": suggestions,
+        "conversation_history": updated_history,
     }

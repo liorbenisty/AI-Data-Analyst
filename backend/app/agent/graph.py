@@ -1,4 +1,5 @@
 from langgraph.graph import StateGraph, END
+from langgraph.checkpoint.memory import MemorySaver
 
 from app.config import MAX_RETRIES
 from app.agent.state import AgentState
@@ -50,4 +51,5 @@ def build_graph() -> StateGraph:
     return graph
 
 
-agent = build_graph().compile()
+memory = MemorySaver()
+agent = build_graph().compile(checkpointer=memory)

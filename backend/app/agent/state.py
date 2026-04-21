@@ -12,3 +12,5 @@ class AgentState(TypedDict):
     chart_path: str
     error: str
     retry_count: int
+    conversation_history: list
+    follow_up_suggestions: list

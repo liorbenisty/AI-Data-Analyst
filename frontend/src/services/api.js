@@ -21,8 +21,17 @@ export const listFiles = async () => {
   return response.data;
 };
 
-export const sendChatMessage = async (message, fileId) => {
-  const response = await api.post('/chat', { message, file_id: fileId });
+export const sendChatMessage = async (message, fileId, sessionId) => {
+  const response = await api.post('/chat', {
+    message,
+    file_id: fileId,
+    session_id: sessionId || '',
+  });
+  return response.data;
+};
+
+export const resetSession = async (sessionId) => {
+  const response = await api.post('/chat/reset', { session_id: sessionId });
   return response.data;
 };
 

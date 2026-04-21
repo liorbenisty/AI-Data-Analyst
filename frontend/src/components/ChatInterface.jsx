@@ -9,12 +9,63 @@ import SendIcon from '@mui/icons-material/Send';
 import AutoGraphIcon from '@mui/icons-material/AutoGraph';
 import MessageBubble from './MessageBubble';
 
-const SUGGESTIONS = [
+const FALLBACK_SUGGESTIONS = [
   'Show me a summary of the dataset',
-  'What are the top 5 rows by revenue?',
-  'Create a bar chart of revenue by category',
-  'Show the trend over time',
+  'What are the top 5 rows?',
+  'Create a bar chart of the data',
+  'Show the distribution of values',
 ];
+
+function SuggestionChips({ items, onSelect, animated }) {
+  if (!items?.length) return null;
+
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 1,
+        justifyContent: 'center',
+        maxWidth: 560,
+      }}
+    >
+      {items.map((s, i) => {
+        const chip = (
+          <Box
+            key={s}
+            onClick={() => onSelect(s)}
+            sx={{
+              px: 2,
+              py: 1,
+              borderRadius: 2,
+              border: 1,
+              borderColor: 'divider',
+              cursor: 'pointer',
+              fontSize: '0.8125rem',
+              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+              '&:hover': {
+                borderColor: 'primary.main',
+                bgcolor: 'action.hover',
+                transform: 'translateY(-1px)',
+              },
+            }}
+          >
+            {s}
+          </Box>
+        );
+
+        if (animated) {
+          return (
+            <Grow key={s} in timeout={400 + i * 100}>
+              {chip}
+            </Grow>
+          );
+        }
+        return chip;
+      })}
+    </Box>
+  );
+}
 
 function AnimatedMessage({ children, index }) {
   const [show, setShow] = useState(false);
@@ -31,17 +82,27 @@ function AnimatedMessage({ children, index }) {
   );
 }
 
-export default function ChatInterface({ messages, loading, onSend, activeFile }) {
+export default function ChatInterface({
+  messages,
+  loading,
+  onSend,
+  activeFile,
+  suggestions = [],
+  followUpSuggestions = [],
+}) {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
 
+  const initialSuggestions = suggestions.length > 0 ? suggestions : FALLBACK_SUGGESTIONS;
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, followUpSuggestions]);
 
-  const handleSend = () => {
-    if (!input.trim() || loading || !activeFile) return;
-    onSend(input.trim());
+  const handleSend = (text) => {
+    const value = text || input.trim();
+    if (!value || loading || !activeFile) return;
+    onSend(value);
     setInput('');
   };
 
@@ -52,10 +113,13 @@ export default function ChatInterface({ messages, loading, onSend, activeFile })
     }
   };
 
+  const hasMessages = messages.length > 0;
+  const showFollowUps = hasMessages && !loading && followUpSuggestions.length > 0;
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <Box sx={{ flex: 1, overflow: 'auto', px: 3, py: 2 }}>
-        {messages.length === 0 ? (
+        {!hasMessages ? (
           <Fade in timeout={600}>
             <Box
               sx={{
@@ -96,40 +160,11 @@ export default function ChatInterface({ messages, loading, onSend, activeFile })
                 </Typography>
               </Box>
               {activeFile && (
-                <Box
-                  sx={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: 1,
-                    justifyContent: 'center',
-                    maxWidth: 520,
-                  }}
-                >
-                  {SUGGESTIONS.map((s, i) => (
-                    <Grow key={s} in timeout={400 + i * 100}>
-                      <Box
-                        onClick={() => setInput(s)}
-                        sx={{
-                          px: 2,
-                          py: 1,
-                          borderRadius: 2,
-                          border: 1,
-                          borderColor: 'divider',
-                          cursor: 'pointer',
-                          fontSize: '0.8125rem',
-                          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                          '&:hover': {
-                            borderColor: 'primary.main',
-                            bgcolor: 'action.hover',
-                            transform: 'translateY(-1px)',
-                          },
-                        }}
-                      >
-                        {s}
-                      </Box>
-                    </Grow>
-                  ))}
-                </Box>
+                <SuggestionChips
+                  items={initialSuggestions}
+                  onSelect={(s) => handleSend(s)}
+                  animated
+                />
               )}
             </Box>
           </Fade>
@@ -140,6 +175,21 @@ export default function ChatInterface({ messages, loading, onSend, activeFile })
                 <MessageBubble message={msg} />
               </AnimatedMessage>
             ))}
+
+            {showFollowUps && (
+              <Fade in timeout={400}>
+                <Box sx={{ mt: 2, mb: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Continue exploring
+                  </Typography>
+                  <SuggestionChips
+                    items={followUpSuggestions}
+                    onSelect={(s) => handleSend(s)}
+                  />
+                </Box>
+              </Fade>
+            )}
+
             <div ref={messagesEndRef} />
           </>
         )}
@@ -179,7 +229,7 @@ export default function ChatInterface({ messages, loading, onSend, activeFile })
             }}
           />
           <IconButton
-            onClick={handleSend}
+            onClick={() => handleSend()}
             disabled={!input.trim() || loading || !activeFile}
             color="primary"
             sx={{

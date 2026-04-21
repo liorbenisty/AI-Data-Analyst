@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from langchain_core.messages import HumanMessage
 
-from app.agent.graph import agent
+from app.agent.graph import agent, memory
 from app.services.file_handler import get_file_metadata
 
 logger = logging.getLogger(__name__)
@@ -17,9 +17,14 @@ _executor = ThreadPoolExecutor(max_workers=4)
 class ChatRequest(BaseModel):
     message: str
     file_id: str
+    session_id: str = ""
 
 
-def _run_agent(message: str, file_id: str, file_path: str) -> dict:
+class ResetRequest(BaseModel):
+    session_id: str
+
+
+def _run_agent(message: str, file_id: str, file_path: str, session_id: str) -> dict:
     initial_state = {
         "messages": [HumanMessage(content=message)],
         "file_id": file_id,
@@ -32,7 +37,8 @@ def _run_agent(message: str, file_id: str, file_path: str) -> dict:
         "retry_count": 0,
     }
 
-    result = agent.invoke(initial_state)
+    config = {"configurable": {"thread_id": session_id}} if session_id else None
+    result = agent.invoke(initial_state, config)
 
     ai_message = ""
     for msg in reversed(result.get("messages", [])):
@@ -49,6 +55,7 @@ def _run_agent(message: str, file_id: str, file_path: str) -> dict:
         "code": result.get("generated_code", ""),
         "execution_result": result.get("execution_result", ""),
         "error": result.get("error", ""),
+        "follow_up_suggestions": result.get("follow_up_suggestions", []),
     }
 
 
@@ -72,9 +79,28 @@ async def chat(request: ChatRequest):
             request.message,
             request.file_id,
             meta["file_path"],
+            request.session_id,
         )
     except Exception as e:
         logger.exception("Agent execution failed")
         raise HTTPException(status_code=500, detail=str(e))
 
     return result
+
+
+@router.post("/chat/reset")
+async def reset_session(request: ResetRequest):
+    if not request.session_id.strip():
+        raise HTTPException(status_code=400, detail="Session ID is required")
+
+    try:
+        if hasattr(memory, 'storage'):
+            keys_to_delete = [
+                k for k in memory.storage if request.session_id in str(k)
+            ]
+            for k in keys_to_delete:
+                del memory.storage[k]
+    except Exception as e:
+        logger.warning("Failed to clear session memory: %s", e)
+
+    return {"status": "ok"}

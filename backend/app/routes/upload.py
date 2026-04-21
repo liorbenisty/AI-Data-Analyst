@@ -7,6 +7,7 @@ from app.services.file_handler import (
     get_file_metadata,
     FileValidationError,
 )
+from app.services.suggestions import generate_suggestions
 
 router = APIRouter(tags=["files"])
 
@@ -25,11 +26,14 @@ async def upload_file(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to process file: {e}")
 
+    suggestions = generate_suggestions(metadata["schema"])
+
     return {
         "file_id": metadata["file_id"],
         "original_name": metadata["original_name"],
         "size_bytes": metadata["size_bytes"],
         "schema": metadata["schema"],
+        "suggestions": suggestions,
     }
 
 
